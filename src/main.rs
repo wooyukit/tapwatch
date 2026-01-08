@@ -1,6 +1,7 @@
 mod app;
 mod font;
 mod iterm2;
+mod key_spritesheet;
 mod sprite;
 mod spritesheet;
 mod ui;

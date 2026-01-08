@@ -8,13 +8,32 @@ pub fn is_iterm2() -> bool {
         .unwrap_or(false)
 }
 
-/// Check if terminal supports inline images (iTerm2, WezTerm, Mintty)
+/// Check if terminal supports inline images (iTerm2 protocol)
+/// Supports: iTerm2, WezTerm, Mintty, Kitty, Konsole, Hyper
 pub fn supports_inline_images() -> bool {
+    // Check TERM_PROGRAM first
     if let Ok(term) = std::env::var("TERM_PROGRAM") {
-        matches!(term.as_str(), "iTerm.app" | "WezTerm" | "mintty")
-    } else {
-        false
+        if matches!(
+            term.as_str(),
+            "iTerm.app" | "WezTerm" | "mintty" | "Hyper" | "Konsole"
+        ) {
+            return true;
+        }
     }
+
+    // Check for Kitty terminal via TERM env var
+    if let Ok(term) = std::env::var("TERM") {
+        if term.contains("kitty") {
+            return true;
+        }
+    }
+
+    // Check for Kitty via KITTY_WINDOW_ID
+    if std::env::var("KITTY_WINDOW_ID").is_ok() {
+        return true;
+    }
+
+    false
 }
 
 /// Display an inline image in iTerm2
