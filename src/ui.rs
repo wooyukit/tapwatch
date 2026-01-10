@@ -1,7 +1,7 @@
 use crate::app::{AnimationState, App};
-use crate::iterm2;
 use crate::sprite;
 use crate::spritesheet;
+use crate::terminal;
 use ratatui::{
     layout::{Constraint, Layout, Rect},
     style::{Color, Style},
@@ -51,7 +51,7 @@ pub fn draw(frame: &mut Frame, app: &App, needs_image_redraw: bool) {
 
 fn draw_dog(frame: &mut Frame, area: Rect, app: &App, needs_image_redraw: bool) {
     // Use sprite sheet if available and terminal supports inline images
-    if spritesheet::is_loaded() && iterm2::supports_inline_images() {
+    if spritesheet::is_loaded() && terminal::supports_inline_images() {
         // Only redraw image when state changed to prevent flashing
         if needs_image_redraw {
             display_spritesheet_frame(area, app);
@@ -75,7 +75,7 @@ fn display_spritesheet_frame(area: Rect, app: &App) {
         let col = area.x;  // Align to left
         let row = area.y + (area.height.saturating_sub(sprite_height)) / 2;
 
-        let _ = iterm2::display_image_at_position(
+        let _ = terminal::display_image_at_position(
             data,
             row,
             col,

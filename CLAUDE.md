@@ -25,7 +25,7 @@ src/
 ├── main.rs           # Event loop, global key capture via rdev, terminal setup
 ├── app.rs            # Application state, animation state machine (Idle↔Typing)
 ├── ui.rs             # Ratatui UI rendering, sprite display logic
-├── iterm2.rs         # iTerm2 inline image protocol (OSC 1337)
+├── terminal.rs       # Terminal capability detection & inline image display (OSC 1337)
 ├── spritesheet.rs    # Dog sprite sheet extraction (1024x1024, 4x4 grid)
 ├── sprite.rs         # Text-based sprite fallback (Unicode block chars)
 └── assets/

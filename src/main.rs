@@ -1,7 +1,7 @@
 mod app;
-mod iterm2;
 mod sprite;
 mod spritesheet;
+mod terminal;
 mod ui;
 
 use app::App;
