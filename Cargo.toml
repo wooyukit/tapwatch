@@ -2,6 +2,15 @@
 name = "tapwatch"
 version = "0.1.0"
 edition = "2021"
+authors = ["wooyukit"]
+description = "A terminal-based typing companion app with an animated dog character that reacts to your keystrokes"
+license = "MIT"
+repository = "https://github.com/wooyukit/tapwatch"
+homepage = "https://github.com/wooyukit/tapwatch"
+readme = "README.md"
+keywords = ["terminal", "typing", "animation", "tui", "keyboard"]
+categories = ["command-line-utilities", "visualization"]
+exclude = ["assets/*.png"]
 
 [dependencies]
 ratatui = "0.29"
