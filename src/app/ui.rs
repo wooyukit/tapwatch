@@ -1,21 +1,25 @@
-use crate::app::{AnimationState, App};
-use crate::sprite;
-use crate::spritesheet;
-use crate::terminal;
+use super::sprite;
+use super::spritesheet;
+use super::state::{AnimationState, App};
+use super::terminal;
 use ratatui::{
     layout::{Constraint, Layout, Rect},
     style::{Color, Style},
     widgets::Paragraph,
     Frame,
 };
+use std::time::Duration;
+use tachyonfx::Shader;
 use tui_big_text::{BigText, PixelSize};
 
 // Color Palette
 const WHITE: Color = Color::Rgb(255, 255, 255);
 const CREAM: Color = Color::Rgb(255, 252, 245);
-const KEY_TEXT: Color = Color::Rgb(200, 200, 220);  // Key letter color - soft light gray-blue
 
-pub fn draw(frame: &mut Frame, app: &App, needs_image_redraw: bool) {
+// Playful/cute text color - soft and friendly
+const TEXT_MAIN: Color = Color::Rgb(255, 182, 193);    // Soft pink
+
+pub fn draw(frame: &mut Frame, app: &mut App, needs_image_redraw: bool, elapsed: Duration) {
     let area = frame.area();
 
     // Calculate centered content area
@@ -32,20 +36,27 @@ pub fn draw(frame: &mut Frame, app: &App, needs_image_redraw: bool) {
         height: content_height,
     };
 
-    // Horizontal layout: key on left, dog on right (close together)
-    let chunks = Layout::horizontal([
-        Constraint::Length(8),  // Key display (left, compact)
-        Constraint::Min(20),    // Dog sprite (right, flexible)
+    // Vertical layout: text on top, dog below
+    let chunks = Layout::vertical([
+        Constraint::Length(4),   // Text display (top)
+        Constraint::Min(10),     // Dog sprite (bottom)
     ])
     .split(content);
 
-    // Draw components (only redraw images when state changed)
-    // Draw dog first, then key overlay
+    // Draw components
+    // Draw dog first
     draw_dog(frame, chunks[1], app, needs_image_redraw);
 
-    // Only show key if one has been pressed
-    if app.last_key.is_some() {
-        draw_key_display(frame, chunks[0], app, needs_image_redraw);
+    // Draw text if there's any typed text
+    if !app.typed_text.is_empty() {
+        let text_area = draw_text_display(frame, chunks[0], app);
+
+        // Apply fade-out effect if active
+        if let Some(ref mut effect) = app.fade_effect {
+            if !effect.done() {
+                effect.process(elapsed.into(), frame.buffer_mut(), text_area);
+            }
+        }
     }
 }
 
@@ -69,10 +80,10 @@ fn display_spritesheet_frame(area: Rect, app: &App) {
     };
 
     if let Some(data) = frame_data {
-        // Position sprite at left side of area (close to key)
+        // Center sprite in area
         let sprite_width = 20u16;
         let sprite_height = 10u16;
-        let col = area.x;  // Align to left
+        let col = area.x + (area.width.saturating_sub(sprite_width)) / 2;
         let row = area.y + (area.height.saturating_sub(sprite_height)) / 2;
 
         let _ = terminal::display_image_at_position(
@@ -98,7 +109,8 @@ fn draw_dog_sprite(frame: &mut Frame, area: Rect, app: &App) {
 
     let sprite_width = sprite.first().map(|s| s.len()).unwrap_or(0) as u16;
     let sprite_height = sprite.len() as u16;
-    let sprite_x = area.x;  // Align to left (close to key)
+    // Center sprite in area
+    let sprite_x = area.x + (area.width.saturating_sub(sprite_width)) / 2;
     let sprite_y = area.y + (area.height.saturating_sub(sprite_height)) / 2;
 
     for (i, row) in sprite.iter().enumerate() {
@@ -117,48 +129,47 @@ fn draw_dog_sprite(frame: &mut Frame, area: Rect, app: &App) {
     }
 }
 
-fn draw_key_display(frame: &mut Frame, area: Rect, app: &App, _needs_image_redraw: bool) {
-    let key_str = match &app.last_key {
-        Some(k) => get_display_char(k),
-        None => return,
-    };
+fn draw_text_display(frame: &mut Frame, area: Rect, app: &App) -> Rect {
+    if app.typed_text.is_empty() {
+        return area;
+    }
 
-    // Use BigText widget for large, stylish key display
-    let big_text = BigText::builder()
-        .pixel_size(PixelSize::Quadrant)
-        .style(Style::default().fg(KEY_TEXT))
-        .right_aligned()  // Align to right (close to dog)
-        .lines(vec![key_str.into()])
-        .build();
-
-    // Position at right side of area, vertically centered
-    let text_height = 4u16; // Quadrant pixel size = 4 rows for 8px font
-    let key_area = Rect {
+    // Center text horizontally and use full height
+    let text_height = 4u16; // Quadrant pixel size = 4 rows
+    let text_area = Rect {
         x: area.x,
         y: area.y + area.height.saturating_sub(text_height) / 2,
         width: area.width,
         height: text_height.min(area.height),
     };
-    frame.render_widget(big_text, key_area);
-}
 
-/// Convert key string to a display-friendly character/string
-fn get_display_char(key: &str) -> String {
-    match key {
-        "␣" => "_".to_string(),      // Space shown as underscore
-        "⏎" => "<-".to_string(),     // Enter/Return
-        "⌫" => "<".to_string(),      // Backspace
-        "⇥" => "->".to_string(),     // Tab
-        "⎋" => "X".to_string(),      // Escape
-        "⌦" => ">".to_string(),      // Delete
-        "⇧" => "^".to_string(),      // Shift
-        "⌃" => "C".to_string(),      // Control
-        "⌥" => "A".to_string(),      // Alt/Option
-        "⌘" => "@".to_string(),      // Command
-        "↑" => "^".to_string(),      // Up arrow
-        "↓" => "v".to_string(),      // Down arrow
-        "←" => "<".to_string(),      // Left arrow
-        "→" => ">".to_string(),      // Right arrow
-        s => s.chars().next().map(|c| c.to_string()).unwrap_or("?".to_string()),
-    }
+    // Calculate how many characters fit (each char is ~4 columns in Quadrant mode)
+    let char_width = 4u16;
+    let max_chars = (area.width / char_width) as usize;
+
+    // Check if text fits in the area
+    let text_fits = app.typed_text.len() <= max_chars || max_chars == 0;
+
+    let text = if text_fits {
+        // Text fits - center it
+        BigText::builder()
+            .pixel_size(PixelSize::Quadrant)
+            .style(Style::default().fg(TEXT_MAIN))
+            .centered()
+            .lines(vec![app.typed_text.clone().into()])
+            .build()
+    } else {
+        // Text too long - show rightmost characters, right-aligned
+        let start = app.typed_text.len() - max_chars;
+        let display_text = &app.typed_text[start..];
+        BigText::builder()
+            .pixel_size(PixelSize::Quadrant)
+            .style(Style::default().fg(TEXT_MAIN))
+            .right_aligned()
+            .lines(vec![display_text.to_string().into()])
+            .build()
+    };
+
+    frame.render_widget(text, text_area);
+    text_area
 }

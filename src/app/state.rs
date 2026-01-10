@@ -1,5 +1,6 @@
 use rand::Rng;
 use std::time::{Duration, Instant};
+use tachyonfx::{fx, Effect, Interpolation, Shader};
 
 /// Animation frame duration for typing effect (slower)
 const TYPING_ANIMATION_DURATION: Duration = Duration::from_millis(250);
@@ -16,6 +17,12 @@ const IDLE_FRAME_COUNT: usize = 8;
 /// How long to continue typing animation after last keypress
 const TYPING_LINGER_DURATION: Duration = Duration::from_secs(3);
 
+/// Duration for fade-out effect when stopping typing
+const FADE_OUT_DURATION: u32 = 800; // milliseconds
+
+/// Maximum length of accumulated text (generous limit to prevent memory issues)
+const MAX_TEXT_LENGTH: usize = 100;
+
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum AnimationState {
     Idle,
@@ -31,8 +38,8 @@ pub struct App {
     pub idle_frame: usize,
     /// Time of the last keypress (for typing animation duration)
     pub last_keypress_time: Instant,
-    /// Last key that was pressed
-    pub last_key: Option<String>,
+    /// Accumulated typed text (cleared on special keys or timeout)
+    pub typed_text: String,
     /// Time of last typing animation frame change
     pub last_typing_frame_time: Instant,
     /// Time of last idle animation frame change
@@ -47,10 +54,16 @@ pub struct App {
     pub last_rendered_state: Option<AnimationState>,
     /// Track last rendered frame index
     pub last_rendered_frame: usize,
-    /// Track last rendered key
-    pub last_rendered_key: Option<String>,
+    /// Track last rendered text
+    pub last_rendered_text: String,
     /// Track last terminal size for redraw on resize
     pub last_terminal_size: (u16, u16),
+    /// Effect for fade-out animation
+    pub fade_effect: Option<Effect>,
+    /// Time of last frame for effect delta calculation
+    pub last_frame_time: Instant,
+    /// Whether current text is from a special key (should be cleared on next regular key)
+    pub is_special_key_text: bool,
 }
 
 impl App {
@@ -60,7 +73,7 @@ impl App {
             typing_frame: 0,
             idle_frame: 0,
             last_keypress_time: Instant::now(),
-            last_key: None,
+            typed_text: String::new(),
             last_typing_frame_time: Instant::now(),
             last_idle_frame_time: Instant::now(),
             should_quit: false,
@@ -68,15 +81,80 @@ impl App {
             frame_count: 0,
             last_rendered_state: None,
             last_rendered_frame: 0,
-            last_rendered_key: None,
+            last_rendered_text: String::new(),
             last_terminal_size: (0, 0),
+            fade_effect: None,
+            last_frame_time: Instant::now(),
+            is_special_key_text: false,
+        }
+    }
+
+    /// Check if a key should be ignored (modifier keys)
+    fn is_ignored_key(key: &str) -> bool {
+        matches!(key, "⇧" | "⌃" | "⌥" | "⌘")  // Shift, Ctrl, Alt, Cmd
+    }
+
+    /// Check if a key is a special key that should clear accumulated text
+    fn is_special_key(key: &str) -> bool {
+        matches!(
+            key,
+            "␣" | "⏎" | "⇥" | "⌫" | "⎋" | "⌦"
+            | "↑" | "↓" | "←" | "→"
+            | "F1" | "F2" | "F3" | "F4" | "F5" | "F6" | "F7" | "F8" | "F9" | "F10" | "F11" | "F12"
+        )
+    }
+
+    /// Get display representation for special keys
+    fn get_special_key_display(key: &str) -> &str {
+        match key {
+            "␣" => "Space",
+            "⏎" => "Enter",
+            "⇥" => "Tab",
+            "⌫" => "Back",
+            "⎋" => "Esc",
+            "⌦" => "Del",
+            "↑" => "Up",
+            "↓" => "Down",
+            "←" => "Left",
+            "→" => "Right",
+            s => s,
         }
     }
 
     /// Handle a key press event
     pub fn on_key(&mut self, key: String) {
-        self.last_key = Some(key);
+        // Ignore modifier keys entirely
+        if Self::is_ignored_key(&key) {
+            return;
+        }
+
         self.last_keypress_time = Instant::now();
+
+        // Clear any fade effect since we're typing again
+        self.fade_effect = None;
+
+        // Handle special keys vs regular keys
+        if Self::is_special_key(&key) {
+            // Replace text with special key display
+            self.typed_text = Self::get_special_key_display(&key).to_string();
+            self.is_special_key_text = true;
+        } else {
+            // If previous text was from a special key, clear it first
+            if self.is_special_key_text {
+                self.typed_text.clear();
+                self.is_special_key_text = false;
+            }
+
+            // Append to accumulated text
+            self.typed_text.push_str(&key);
+
+            // Limit text length
+            if self.typed_text.len() > MAX_TEXT_LENGTH {
+                // Keep only the last MAX_TEXT_LENGTH characters
+                let start = self.typed_text.len() - MAX_TEXT_LENGTH;
+                self.typed_text = self.typed_text[start..].to_string();
+            }
+        }
 
         // Start typing animation if not already typing
         if self.animation_state != AnimationState::Typing {
@@ -111,6 +189,9 @@ impl App {
                     // Randomly select an idle frame for variety
                     self.idle_frame = rand::thread_rng().gen_range(0..IDLE_FRAME_COUNT);
                     self.last_idle_frame_time = now;
+
+                    // Start dissolve effect for the text (characters disappear randomly)
+                    self.fade_effect = Some(fx::dissolve((FADE_OUT_DURATION, Interpolation::QuadOut)));
                 }
             }
             AnimationState::Idle => {
@@ -119,6 +200,14 @@ impl App {
                     self.last_idle_frame_time = now;
                     self.idle_frame = (self.idle_frame + 1) % IDLE_FRAME_COUNT;
                 }
+
+                // Clear text after fade effect completes
+                if let Some(ref effect) = self.fade_effect {
+                    if effect.done() {
+                        self.typed_text.clear();
+                        self.fade_effect = None;
+                    }
+                }
             }
         }
     }
@@ -126,6 +215,14 @@ impl App {
     /// Request app to quit
     pub fn quit(&mut self) {
         self.should_quit = true;
+    }
+
+    /// Get elapsed time since last frame and reset timer
+    pub fn get_elapsed(&mut self) -> Duration {
+        let now = Instant::now();
+        let elapsed = now.duration_since(self.last_frame_time);
+        self.last_frame_time = now;
+        elapsed
     }
 
     /// Check if the visual state has changed since last render
@@ -144,7 +241,7 @@ impl App {
         if self.last_rendered_frame != current_frame {
             return true;
         }
-        if self.last_rendered_key != self.last_key {
+        if self.last_rendered_text != self.typed_text {
             return true;
         }
         false
@@ -157,7 +254,7 @@ impl App {
             AnimationState::Idle => self.idle_frame,
             AnimationState::Typing => self.typing_frame,
         };
-        self.last_rendered_key = self.last_key.clone();
+        self.last_rendered_text = self.typed_text.clone();
         self.last_terminal_size = terminal_size;
     }
 }
