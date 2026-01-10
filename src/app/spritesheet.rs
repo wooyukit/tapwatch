@@ -2,8 +2,8 @@ use image::{DynamicImage, ImageFormat, Rgba, RgbaImage};
 use once_cell::sync::Lazy;
 use std::io::Cursor;
 
-// Sprite sheet configuration
-const SPRITE_SHEET_PATH: &str = "src/assets/dog_sprites.png";
+// Embed sprite sheet at compile time for reliable loading
+const SPRITE_SHEET_BYTES: &[u8] = include_bytes!("../assets/dog_sprites.png");
 
 // Frame layout in the sprite sheet (1024x1024 pixels, 4x4 grid)
 const FRAME_WIDTH: u32 = 256;  // 1024 / 4
@@ -49,11 +49,9 @@ const TYPING_FRAMES: &[FrameRect] = &[
 // Background color to make transparent (white/light gray)
 const BG_THRESHOLD: u8 = 240; // Pixels with R,G,B all above this become transparent
 
-// Load the sprite sheet once
+// Load the sprite sheet once from embedded bytes
 static SPRITE_SHEET: Lazy<Option<DynamicImage>> = Lazy::new(|| {
-    std::fs::read(SPRITE_SHEET_PATH)
-        .ok()
-        .and_then(|bytes| image::load_from_memory(&bytes).ok())
+    image::load_from_memory(SPRITE_SHEET_BYTES).ok()
 });
 
 // Pre-extract frames as PNG bytes for iTerm2 display

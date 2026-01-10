@@ -16,24 +16,24 @@ const TEXT_MAIN: Color = Color::Rgb(255, 182, 193);    // Soft pink
 pub fn draw(frame: &mut Frame, app: &mut App, needs_image_redraw: bool, elapsed: Duration) {
     let area = frame.area();
 
-    // Calculate centered content area
-    let content_width = 50u16.min(area.width.saturating_sub(4));
-    let content_height = 16u16.min(area.height.saturating_sub(2));
+    // Content dimensions
+    let text_height = 4u16;
+    let dog_height = 10u16;
+    let total_content_height = text_height + dog_height;
 
-    let h_pad = (area.width.saturating_sub(content_width)) / 2;
-    let v_pad = (area.height.saturating_sub(content_height)) / 2;
-
+    // Center content vertically
+    let v_pad = area.height.saturating_sub(total_content_height) / 2;
     let content = Rect {
-        x: area.x + h_pad,
+        x: area.x,
         y: area.y + v_pad,
-        width: content_width,
-        height: content_height,
+        width: area.width,
+        height: total_content_height.min(area.height),
     };
 
-    // Vertical layout: text on top, dog below
+    // Vertical layout: text on top, dog below (both centered together)
     let chunks = Layout::vertical([
-        Constraint::Length(4),   // Text display (top)
-        Constraint::Min(10),     // Dog sprite (bottom)
+        Constraint::Length(text_height),  // Text display (top)
+        Constraint::Length(dog_height),   // Dog sprite (bottom)
     ])
     .split(content);
 
@@ -43,9 +43,18 @@ pub fn draw(frame: &mut Frame, app: &mut App, needs_image_redraw: bool, elapsed:
 
     // Draw text if there's any typed text
     if !app.typed_text.is_empty() {
-        let text_area = draw_text_display(frame, chunks[0], app);
+        let (text_area, new_char_area) = draw_text_display(frame, chunks[0], app);
 
-        // Apply fade-out effect if active
+        // Apply typing effect (coalesce) only to new character area
+        if let Some(ref mut effect) = app.typing_effect {
+            if !effect.done() {
+                if let Some(char_area) = new_char_area {
+                    effect.process(elapsed.into(), frame.buffer_mut(), char_area);
+                }
+            }
+        }
+
+        // Apply fade-out effect to full text area
         if let Some(ref mut effect) = app.fade_effect {
             if !effect.done() {
                 effect.process(elapsed.into(), frame.buffer_mut(), text_area);
@@ -85,9 +94,10 @@ fn display_spritesheet_frame(area: Rect, app: &App) {
     }
 }
 
-fn draw_text_display(frame: &mut Frame, area: Rect, app: &App) -> Rect {
+/// Returns (full_text_area, new_char_area)
+fn draw_text_display(frame: &mut Frame, area: Rect, app: &App) -> (Rect, Option<Rect>) {
     if app.typed_text.is_empty() {
-        return area;
+        return (area, None);
     }
 
     // Center text horizontally and use full height
@@ -103,8 +113,12 @@ fn draw_text_display(frame: &mut Frame, area: Rect, app: &App) -> Rect {
     let char_width = 4u16;
     let max_chars = (area.width / char_width) as usize;
 
+    // Count displayed characters
+    let total_chars = app.typed_text.chars().count();
+    let displayed_chars = total_chars.min(max_chars);
+
     // Check if text fits in the area
-    let text_fits = app.typed_text.len() <= max_chars || max_chars == 0;
+    let text_fits = total_chars <= max_chars || max_chars == 0;
 
     let text = if text_fits {
         // Text fits - center it
@@ -127,5 +141,35 @@ fn draw_text_display(frame: &mut Frame, area: Rect, app: &App) -> Rect {
     };
 
     frame.render_widget(text, text_area);
-    text_area
+
+    // Calculate the area for just the new character(s)
+    let new_char_area = if app.new_char_count > 0 && displayed_chars > 0 {
+        let new_chars_width = (app.new_char_count as u16) * char_width;
+
+        if text_fits {
+            // Text is centered - new char is at the end of centered text
+            let total_text_width = (displayed_chars as u16) * char_width;
+            let text_start_x = text_area.x + (text_area.width.saturating_sub(total_text_width)) / 2;
+            let new_char_x = text_start_x + total_text_width - new_chars_width;
+
+            Some(Rect {
+                x: new_char_x,
+                y: text_area.y,
+                width: new_chars_width,
+                height: text_area.height,
+            })
+        } else {
+            // Text is right-aligned - new char is at the right edge
+            Some(Rect {
+                x: text_area.x + text_area.width - new_chars_width,
+                y: text_area.y,
+                width: new_chars_width,
+                height: text_area.height,
+            })
+        }
+    } else {
+        None
+    };
+
+    (text_area, new_char_area)
 }

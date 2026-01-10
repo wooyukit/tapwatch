@@ -52,9 +52,22 @@ src/
 
 **Key Display:** Uses `tui-big-text` crate with `PixelSize::Quadrant` for large, stylish character display. Special keys (Space, Enter, etc.) are converted to ASCII representations.
 
+**UI Layout:** Text displayed above dog sprite, both vertically centered together in the window. Text height: 4 rows, Dog height: 10 rows.
+
 **Dirty-State Rendering:** The app tracks `last_rendered_state`, `last_rendered_frame`, `last_rendered_key`, and `last_terminal_size` to only redraw iTerm2 images when visual state actually changes, preventing flicker.
 
-**Exit Controls:** Press `q`, `Esc`, or `Ctrl+C` to quit the application.
+**Text Animation:**
+- Typing effect: New characters appear with coalesce animation (150ms)
+- Fade out effect: Text dissolves when idle (800ms)
+
+**Window Positioning:** Arrow keys fit and move window to screen edges using AppleScript (macOS/iTerm2).
+
+**Controls:**
+- `Arrow Up` - Fit & move window to top edge
+- `Arrow Down` - Fit & move window to bottom edge
+- `Arrow Left` - Fit & move window to left edge
+- `Arrow Right` - Fit & move window to right edge
+- `q`, `Esc`, or `Ctrl+C` - Quit the application
 
 ## Key Dependencies
 

@@ -15,6 +15,10 @@ A terminal-based typing companion that displays an animated dog reacting to your
 - Global Key Capture - Monitors keystrokes system-wide
 - Sprite Animation - Smooth animations with idle and typing states
 - Big Key Display - See your last pressed key in stylish large text
+- Typing Effects - New characters appear with a coalesce animation
+- Text Fade Out - Text dissolves when you stop typing
+- Window Positioning - Snap window to screen edges with arrow keys
+- Compact Layout - Perfect as a coding companion
 
 ## Installation
 
@@ -25,7 +29,7 @@ cargo install tapwatch
 Or build from source:
 
 ```bash
-git clone https://github.com/user/tapwatch
+git clone https://github.com/wooyukit/tapwatch
 cd tapwatch
 cargo build --release
 ```
@@ -36,15 +40,29 @@ cargo build --release
 tapwatch
 ```
 
-**Controls:**
-- Press any key to see the dog react!
-- Press `q`, `Esc`, or `Ctrl+C` to exit
+Or run with cargo:
+
+```bash
+cargo run --release
+```
+
+## Controls
+
+| Key | Action |
+|-----|--------|
+| `q` | Quit |
+| `Esc` | Quit |
+| `Ctrl+C` | Quit |
+| `Arrow Up` | Fit & move window to top edge |
+| `Arrow Down` | Fit & move window to bottom edge |
+| `Arrow Left` | Fit & move window to left edge |
+| `Arrow Right` | Fit & move window to right edge |
 
 ## Terminal Support
 
 TapWatch uses iTerm2's inline image protocol (OSC 1337) for sprite display. For the best experience, use:
 
-- iTerm2
+- iTerm2 (recommended)
 - WezTerm
 - Kitty
 - Other terminals supporting inline images
@@ -72,6 +90,7 @@ When you type, the dog transitions from idle to an energetic typing animation!
 - `rdev` - Global keyboard capture
 - `image` - Sprite processing
 - `tui-big-text` - Large text rendering
+- `tachyonfx` - Text animation effects
 
 ## License
 

@@ -131,6 +131,22 @@ fn run_app(
                         KeyCode::Char('q') => {
                             app.quit();
                         }
+                        KeyCode::Left => {
+                            // Fit and move to left edge
+                            let _ = app::terminal::fit_and_move(app::terminal::Direction::Left);
+                        }
+                        KeyCode::Right => {
+                            // Fit and move to right edge
+                            let _ = app::terminal::fit_and_move(app::terminal::Direction::Right);
+                        }
+                        KeyCode::Up => {
+                            // Fit and move to top edge
+                            let _ = app::terminal::fit_and_move(app::terminal::Direction::Top);
+                        }
+                        KeyCode::Down => {
+                            // Fit and move to bottom edge
+                            let _ = app::terminal::fit_and_move(app::terminal::Direction::Bottom);
+                        }
                         KeyCode::Char('c')
                             if key_event.modifiers.contains(event::KeyModifiers::CONTROL) =>
                         {

@@ -1,6 +1,6 @@
 [package]
 name = "tapwatch"
-version = "0.1.1"
+version = "0.1.2"
 edition = "2021"
 authors = ["wooyukit"]
 description = "A terminal-based typing companion app with an animated dog character that reacts to your keystrokes"
