@@ -23,11 +23,13 @@ cargo build --release  # Release build
 ```
 src/
 ├── main.rs           # Event loop, global key capture via rdev, terminal setup
-├── app.rs            # Application state, animation state machine (Idle↔Typing)
-├── ui.rs             # Ratatui UI rendering, sprite display logic
-├── terminal.rs       # Terminal capability detection & inline image display (OSC 1337)
-├── spritesheet.rs    # Dog sprite sheet extraction (1024x1024, 4x4 grid)
-├── sprite.rs         # Text-based sprite fallback (Unicode block chars)
+├── app/
+│   ├── mod.rs        # Module exports
+│   ├── state.rs      # Application state, animation state machine (Idle↔Typing)
+│   ├── ui.rs         # Ratatui UI rendering, sprite display logic
+│   ├── terminal.rs   # Inline image display (OSC 1337 protocol)
+│   ├── spritesheet.rs # Dog sprite sheet extraction (1024x1024, 4x4 grid)
+│   └── keys.rs       # Key to string conversion
 └── assets/
     └── dog_sprites.png  # Dog animation (4x4 grid, 256x256 per frame)
 ```
@@ -38,7 +40,7 @@ src/
 
 **Sprite Sheet Processing:** Frames are extracted at startup using the `image` crate. White/light backgrounds (RGB > 240) are made transparent via `remove_background()`.
 
-**Dual Display Mode:** Checks `spritesheet::is_loaded() && iterm2::supports_inline_images()` to use PNG sprites, otherwise falls back to text-based Unicode sprites.
+**Inline Image Display:** Uses iTerm2's OSC 1337 protocol for inline image display. If the terminal doesn't support it, only text is shown.
 
 **Animation State Machine:**
 - `Idle` state: Very slow animation (10s per frame, 8 frames from rows 1-2)
@@ -62,3 +64,4 @@ src/
 - `image` - PNG processing and sprite extraction
 - `once_cell` - Lazy static initialization for sprite data
 - `tui-big-text` - Large pixel text rendering for key display
+- `tachyonfx` - Text fade effects

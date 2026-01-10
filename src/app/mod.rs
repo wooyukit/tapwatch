@@ -1,5 +1,4 @@
 pub mod keys;
-pub mod sprite;
 pub mod spritesheet;
 pub mod state;
 pub mod terminal;

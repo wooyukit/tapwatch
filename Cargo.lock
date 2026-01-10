@@ -1511,12 +1511,11 @@ dependencies = [
 
 [[package]]
 name = "tapwatch"
-version = "0.1.0"
+version = "0.1.1"
 dependencies = [
  "base64",
  "crossterm",
  "image",
- "libc",
  "once_cell",
  "rand 0.8.5",
  "ratatui",

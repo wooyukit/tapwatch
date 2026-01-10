@@ -1,20 +1,14 @@
-use super::sprite;
 use super::spritesheet;
 use super::state::{AnimationState, App};
 use super::terminal;
 use ratatui::{
     layout::{Constraint, Layout, Rect},
     style::{Color, Style},
-    widgets::Paragraph,
     Frame,
 };
 use std::time::Duration;
 use tachyonfx::Shader;
 use tui_big_text::{BigText, PixelSize};
-
-// Color Palette
-const WHITE: Color = Color::Rgb(255, 255, 255);
-const CREAM: Color = Color::Rgb(255, 252, 245);
 
 // Playful/cute text color - soft and friendly
 const TEXT_MAIN: Color = Color::Rgb(255, 182, 193);    // Soft pink
@@ -60,16 +54,11 @@ pub fn draw(frame: &mut Frame, app: &mut App, needs_image_redraw: bool, elapsed:
     }
 }
 
-fn draw_dog(frame: &mut Frame, area: Rect, app: &App, needs_image_redraw: bool) {
-    // Use sprite sheet if available and terminal supports inline images
-    if spritesheet::is_loaded() && terminal::supports_inline_images() {
-        // Only redraw image when state changed to prevent flashing
-        if needs_image_redraw {
-            display_spritesheet_frame(area, app);
-        }
-    } else {
-        // Text sprites always render through ratatui (uses differential rendering)
-        draw_dog_sprite(frame, area, app);
+fn draw_dog(_frame: &mut Frame, area: Rect, app: &App, needs_image_redraw: bool) {
+    // Display PNG sprite if spritesheet is loaded
+    // No fallback - if terminal doesn't support images, just show text only
+    if spritesheet::is_loaded() && needs_image_redraw {
+        display_spritesheet_frame(area, app);
     }
 }
 
@@ -93,39 +82,6 @@ fn display_spritesheet_frame(area: Rect, app: &App) {
             Some(sprite_width as u32),
             Some(sprite_height as u32),
         );
-    }
-}
-
-fn draw_dog_sprite(frame: &mut Frame, area: Rect, app: &App) {
-    let sprite = match app.animation_state {
-        AnimationState::Idle => sprite::PIXEL_IDLE,
-        AnimationState::Typing => sprite::get_frame(true, app.typing_frame),
-    };
-
-    let color = match app.animation_state {
-        AnimationState::Typing => WHITE,
-        _ => CREAM,
-    };
-
-    let sprite_width = sprite.first().map(|s| s.len()).unwrap_or(0) as u16;
-    let sprite_height = sprite.len() as u16;
-    // Center sprite in area
-    let sprite_x = area.x + (area.width.saturating_sub(sprite_width)) / 2;
-    let sprite_y = area.y + (area.height.saturating_sub(sprite_height)) / 2;
-
-    for (i, row) in sprite.iter().enumerate() {
-        let para = Paragraph::new(*row)
-            .style(Style::default().fg(color));
-
-        let y_pos = sprite_y + i as u16;
-        if y_pos < area.y + area.height {
-            frame.render_widget(para, Rect {
-                x: sprite_x,
-                y: y_pos,
-                width: sprite_width.min(area.width),
-                height: 1,
-            });
-        }
     }
 }
 
