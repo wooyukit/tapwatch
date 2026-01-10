@@ -1,7 +1,5 @@
 mod app;
-mod font;
 mod iterm2;
-mod key_spritesheet;
 mod sprite;
 mod spritesheet;
 mod ui;
@@ -77,8 +75,20 @@ fn run_app(
     rx: Receiver<String>,
 ) -> io::Result<()> {
     loop {
+        // Get terminal size for dirty-state tracking
+        let term_size = terminal.size()?;
+        let terminal_size = (term_size.width, term_size.height);
+
+        // Check if images need redrawing (before draw closure borrows app)
+        let needs_image_redraw = app.needs_image_redraw(terminal_size);
+
         // Draw UI
-        terminal.draw(|frame| ui::draw(frame, app))?;
+        terminal.draw(|frame| ui::draw(frame, app, needs_image_redraw))?;
+
+        // Mark as rendered if we did redraw images
+        if needs_image_redraw {
+            app.mark_rendered(terminal_size);
+        }
 
         // Check for global key events (non-blocking, drain up to 10 at a time)
         for _ in 0..10 {

@@ -1,13 +1,6 @@
 use base64::{engine::general_purpose::STANDARD, Engine};
 use std::io::{self, Write};
 
-/// Check if running in iTerm2
-pub fn is_iterm2() -> bool {
-    std::env::var("TERM_PROGRAM")
-        .map(|v| v == "iTerm.app")
-        .unwrap_or(false)
-}
-
 /// Check if terminal supports inline images (iTerm2 protocol)
 /// Supports: iTerm2, WezTerm, Mintty, Kitty, Konsole, Hyper
 pub fn supports_inline_images() -> bool {
@@ -93,44 +86,3 @@ pub fn display_image_at_position(
     print!("\x1b8");
     io::stdout().flush()
 }
-
-/// Clear a region and display image there
-/// Useful for animation frames
-pub fn display_image_region(
-    data: &[u8],
-    row: u16,
-    col: u16,
-    clear_width: u16,
-    clear_height: u16,
-    img_width: Option<u32>,
-    img_height: Option<u32>,
-) -> io::Result<()> {
-    // Save cursor
-    print!("\x1b7");
-
-    // Clear the region first (fill with spaces)
-    for r in 0..clear_height {
-        print!("\x1b[{};{}H", row + r + 1, col + 1);
-        print!("{}", " ".repeat(clear_width as usize));
-    }
-
-    // Move to position and display
-    print!("\x1b[{};{}H", row + 1, col + 1);
-    display_image_inline(data, img_width, img_height, true)?;
-
-    // Restore cursor
-    print!("\x1b8");
-    io::stdout().flush()
-}
-
-// Placeholder GIF data (1x1 transparent pixel)
-// This will be replaced with actual dog GIF
-pub const PLACEHOLDER_GIF: &[u8] = &[
-    0x47, 0x49, 0x46, 0x38, 0x39, 0x61, // GIF89a
-    0x01, 0x00, 0x01, 0x00, // 1x1
-    0x00, 0x00, 0x00, // Global color table flag = 0
-    0x21, 0xF9, 0x04, 0x01, 0x00, 0x00, 0x00, 0x00, // Graphics extension
-    0x2C, 0x00, 0x00, 0x00, 0x00, 0x01, 0x00, 0x01, 0x00, 0x00, // Image descriptor
-    0x02, 0x01, 0x44, 0x00, // Image data
-    0x3B // Trailer
-];

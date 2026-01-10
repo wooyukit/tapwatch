@@ -22,15 +22,14 @@ cargo build --release  # Release build
 
 ```
 src/
-├── main.rs        # Event loop, global key capture via rdev, terminal setup
-├── app.rs         # Application state, animation state machine (Idle→Typing→Typed→Idle)
-├── ui.rs          # Ratatui UI rendering, sprite display logic
-├── iterm2.rs      # iTerm2 inline image protocol (OSC 1337)
-├── spritesheet.rs # PNG sprite sheet extraction with background removal
-├── sprite.rs      # Text-based sprite fallback (Unicode block chars)
-├── font.rs        # 5x7 pixel font for big key display
+├── main.rs           # Event loop, global key capture via rdev, terminal setup
+├── app.rs            # Application state, animation state machine (Idle↔Typing)
+├── ui.rs             # Ratatui UI rendering, sprite display logic
+├── iterm2.rs         # iTerm2 inline image protocol (OSC 1337)
+├── spritesheet.rs    # Dog sprite sheet extraction (1024x1024, 4x4 grid)
+├── sprite.rs         # Text-based sprite fallback (Unicode block chars)
 └── assets/
-    └── dog_sprites.png  # Sprite sheet (1024x1040, 5 frames/row typing, 3 idle)
+    └── dog_sprites.png  # Dog animation (4x4 grid, 256x256 per frame)
 ```
 
 ### Key Design Decisions
@@ -41,7 +40,19 @@ src/
 
 **Dual Display Mode:** Checks `spritesheet::is_loaded() && iterm2::supports_inline_images()` to use PNG sprites, otherwise falls back to text-based Unicode sprites.
 
-**Frame Layout:** Sprite sheet assumes 5 columns for typing frames (204x346px each) and 3 columns for idle frames (341x346px each).
+**Animation State Machine:**
+- `Idle` state: Very slow animation (10s per frame, 8 frames from rows 1-2)
+- `Typing` state: Moderate animation (250ms per frame, 8 frames from rows 3-4)
+- Transitions to Typing on keypress, returns to Idle after completing the 8-frame typing cycle
+
+**Sprite Sheet Layout:**
+- Dog sprites: 1024x1024px, 4x4 grid (256x256 per frame). Rows 1-2 = idle, Rows 3-4 = typing
+
+**Key Display:** Uses `tui-big-text` crate with `PixelSize::Quadrant` for large, stylish character display. Special keys (Space, Enter, etc.) are converted to ASCII representations.
+
+**Dirty-State Rendering:** The app tracks `last_rendered_state`, `last_rendered_frame`, `last_rendered_key`, and `last_terminal_size` to only redraw iTerm2 images when visual state actually changes, preventing flicker.
+
+**Exit Controls:** Press `q`, `Esc`, or `Ctrl+C` to quit the application.
 
 ## Key Dependencies
 
@@ -50,3 +61,4 @@ src/
 - `rdev` - Global keyboard/mouse capture
 - `image` - PNG processing and sprite extraction
 - `once_cell` - Lazy static initialization for sprite data
+- `tui-big-text` - Large pixel text rendering for key display
