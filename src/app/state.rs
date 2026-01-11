@@ -107,19 +107,22 @@ impl App {
     fn is_special_key(key: &str) -> bool {
         matches!(
             key,
-            "␣" | "⏎" | "⇥" | "⌫" | "⎋" | "⌦"
+            "⏎" | "⇥" | "⎋" | "⌦"
             | "↑" | "↓" | "←" | "→"
             | "F1" | "F2" | "F3" | "F4" | "F5" | "F6" | "F7" | "F8" | "F9" | "F10" | "F11" | "F12"
         )
     }
 
+    /// Check if a key is backspace (deletes last character)
+    fn is_backspace(key: &str) -> bool {
+        key == "⌫"
+    }
+
     /// Get display representation for special keys
     fn get_special_key_display(key: &str) -> &str {
         match key {
-            "␣" => "Space",
             "⏎" => "Enter",
             "⇥" => "Tab",
-            "⌫" => "Back",
             "⎋" => "Esc",
             "⌦" => "Del",
             "↑" => "Up",
@@ -142,8 +145,20 @@ impl App {
         // Clear any fade effect since we're typing again
         self.fade_effect = None;
 
-        // Handle special keys vs regular keys
-        if Self::is_special_key(&key) {
+        // Handle backspace - delete last character
+        if Self::is_backspace(&key) {
+            if !self.typed_text.is_empty() {
+                // If showing special key text, just clear it
+                if self.is_special_key_text {
+                    self.typed_text.clear();
+                    self.is_special_key_text = false;
+                } else {
+                    // Remove last character
+                    self.typed_text.pop();
+                }
+            }
+            self.new_char_count = 0;
+        } else if Self::is_special_key(&key) {
             // Replace text with special key display
             let display = Self::get_special_key_display(&key).to_string();
             self.new_char_count = display.chars().count(); // All chars are "new"
@@ -178,7 +193,9 @@ impl App {
         }
 
         // Trigger coalesce effect for each keypress (text materializes)
-        self.typing_effect = Some(fx::coalesce((TYPING_EFFECT_DURATION, Interpolation::QuadOut)));
+        if self.new_char_count > 0 {
+            self.typing_effect = Some(fx::coalesce((TYPING_EFFECT_DURATION, Interpolation::QuadOut)));
+        }
     }
 
     /// Update animation state based on timing

@@ -46,7 +46,7 @@ pub fn key_to_string(key: Key, shifted: bool) -> Cow<'static, str> {
         Key::Num9 => Cow::Borrowed(if shifted { "(" } else { "9" }),
 
         // Special keys
-        Key::Space => Cow::Borrowed("␣"),
+        Key::Space => Cow::Borrowed(" "),
         Key::Return => Cow::Borrowed("⏎"),
         Key::Tab => Cow::Borrowed("⇥"),
         Key::Backspace => Cow::Borrowed("⌫"),

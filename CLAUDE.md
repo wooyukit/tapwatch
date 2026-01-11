@@ -60,7 +60,7 @@ src/
 - Typing effect: New characters appear with coalesce animation (150ms)
 - Fade out effect: Text dissolves when idle (800ms)
 
-**Window Positioning:** Arrow keys fit and move window to screen edges using AppleScript (macOS/iTerm2).
+**Window Positioning:** Arrow keys fit and move window to screen edges of the current monitor (where the window is located) using AppleScript (macOS/iTerm2).
 
 **Controls:**
 - `Arrow Up` - Fit & move window to top edge

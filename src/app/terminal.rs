@@ -3,7 +3,7 @@ use std::io::{self, Write};
 
 // Compact window size to fit dog + text
 const FIT_WIDTH: u32 = 400;   // pixels - width for text display
-const FIT_HEIGHT: u32 = 380;  // pixels - height for text + dog
+const FIT_HEIGHT: u32 = 340;  // pixels - height for text + dog (14 rows)
 const MARGIN: u32 = 20;       // margin from screen edge
 
 /// Direction for window movement
@@ -14,52 +14,138 @@ pub enum Direction {
     Right,
 }
 
-/// Fit window and move to edge of main screen (single direction)
+/// Fit window and move to edge of current screen (the screen where the window is located)
 pub fn fit_and_move(direction: Direction) -> io::Result<()> {
+    // Helper script to find the screen containing the window's center point
+    // Note: NSScreen uses Cocoa coords (bottom-left origin, y up)
+    //       Window bounds use screen coords (top-left origin, y down)
+    // Conversion: window_y = mainScreenHeight - cocoa_y - height
+    let find_screen_script = r#"
+        use framework "AppKit"
+
+        -- Get main screen height for coordinate conversion
+        set mainScreen to current application's NSScreen's mainScreen()
+        set mainFrame to mainScreen's frame()
+        set mainScreenHeight to item 2 of item 2 of mainFrame
+
+        -- Get current window bounds (in window/screen coordinates)
+        tell application "iTerm2"
+            tell current window
+                set {wx, wy, wx2, wy2} to bounds
+            end tell
+        end tell
+
+        -- Calculate window center in window coords
+        set winCenterX to (wx + wx2) / 2
+        set winCenterY to (wy + wy2) / 2
+
+        -- Convert window center Y to Cocoa coords for screen lookup
+        set winCenterYCocoa to mainScreenHeight - winCenterY
+
+        -- Find the screen containing this point
+        set allScreens to current application's NSScreen's screens()
+        set screenCount to count of allScreens
+
+        set targetFrame to missing value
+        set targetVisFrame to missing value
+
+        repeat with i from 1 to screenCount
+            set scr to item i of allScreens
+            set scrFrame to scr's frame()
+            set scrX to item 1 of item 1 of scrFrame
+            set scrY to item 2 of item 1 of scrFrame
+            set scrW to item 1 of item 2 of scrFrame
+            set scrH to item 2 of item 2 of scrFrame
+
+            -- Check if window center is within this screen (using Cocoa coords)
+            if winCenterX >= scrX and winCenterX < (scrX + scrW) and winCenterYCocoa >= scrY and winCenterYCocoa < (scrY + scrH) then
+                set targetFrame to scrFrame
+                set targetVisFrame to scr's visibleFrame()
+                exit repeat
+            end if
+        end repeat
+
+        -- Fallback to main screen if not found
+        if targetFrame is missing value then
+            set targetFrame to mainFrame
+            set targetVisFrame to mainScreen's visibleFrame()
+        end if
+    "#;
+
     let script = match direction {
         Direction::Top => format!(
-            r#"tell application "iTerm2"
+            r#"{find_screen}
+
+            -- Get visible frame in Cocoa coords
+            set visOriginY to item 2 of item 1 of targetVisFrame
+            set visHeight to item 2 of item 2 of targetVisFrame
+
+            -- Top of visible area in Cocoa coords = visOriginY + visHeight
+            -- Convert to window coords: mainScreenHeight - (visOriginY + visHeight)
+            set topInWindowCoords to mainScreenHeight - visOriginY - visHeight
+
+            tell application "iTerm2"
                 tell current window
                     set {{x, y, x2, y2}} to bounds
-                    set winWidth to x2 - x
-                    set bounds to {{x, {m}, x + {w}, {m} + {h}}}
+                    -- Keep x position, move to top of current screen
+                    set bounds to {{x, topInWindowCoords + {m}, x + {w}, topInWindowCoords + {m} + {h}}}
                 end tell
             end tell"#,
+            find_screen = find_screen_script,
             m = MARGIN, w = FIT_WIDTH, h = FIT_HEIGHT
         ),
         Direction::Bottom => format!(
-            r#"use framework "AppKit"
-            set mainScreen to current application's NSScreen's mainScreen()
-            set visFrame to mainScreen's visibleFrame()
-            set screenHeight to (item 2 of item 1 of visFrame) + (item 2 of item 2 of visFrame)
+            r#"{find_screen}
+
+            -- Get visible frame in Cocoa coords
+            set visOriginY to item 2 of item 1 of targetVisFrame
+
+            -- Bottom of visible area in Cocoa coords = visOriginY
+            -- Convert to window coords: mainScreenHeight - visOriginY
+            set bottomInWindowCoords to mainScreenHeight - visOriginY
+
             tell application "iTerm2"
                 tell current window
                     set {{x, y, x2, y2}} to bounds
-                    set bounds to {{x, screenHeight - {h} - {m}, x + {w}, screenHeight - {m}}}
+                    -- Keep x position, move to bottom of current screen
+                    set bounds to {{x, bottomInWindowCoords - {h} - {m}, x + {w}, bottomInWindowCoords - {m}}}
                 end tell
             end tell"#,
+            find_screen = find_screen_script,
             m = MARGIN, w = FIT_WIDTH, h = FIT_HEIGHT
         ),
         Direction::Left => format!(
-            r#"tell application "iTerm2"
-                tell current window
-                    set {{x, y, x2, y2}} to bounds
-                    set bounds to {{{m}, y, {m} + {w}, y + {h}}}
-                end tell
-            end tell"#,
-            m = MARGIN, w = FIT_WIDTH, h = FIT_HEIGHT
-        ),
-        Direction::Right => format!(
-            r#"use framework "AppKit"
-            set mainScreen to current application's NSScreen's mainScreen()
-            set frame to mainScreen's frame()
-            set screenWidth to item 1 of item 2 of frame
+            r#"{find_screen}
+
+            -- X coordinates are same in both systems
+            set visOriginX to item 1 of item 1 of targetVisFrame
+
             tell application "iTerm2"
                 tell current window
                     set {{x, y, x2, y2}} to bounds
-                    set bounds to {{screenWidth - {w} - {m}, y, screenWidth - {m}, y + {h}}}
+                    -- Move to left edge, keep y position
+                    set bounds to {{visOriginX + {m}, y, visOriginX + {m} + {w}, y + {h}}}
                 end tell
             end tell"#,
+            find_screen = find_screen_script,
+            m = MARGIN, w = FIT_WIDTH, h = FIT_HEIGHT
+        ),
+        Direction::Right => format!(
+            r#"{find_screen}
+
+            -- X coordinates are same in both systems
+            set visOriginX to item 1 of item 1 of targetVisFrame
+            set visWidth to item 1 of item 2 of targetVisFrame
+            set screenRight to visOriginX + visWidth
+
+            tell application "iTerm2"
+                tell current window
+                    set {{x, y, x2, y2}} to bounds
+                    -- Move to right edge, keep y position
+                    set bounds to {{screenRight - {w} - {m}, y, screenRight - {m}, y + {h}}}
+                end tell
+            end tell"#,
+            find_screen = find_screen_script,
             m = MARGIN, w = FIT_WIDTH, h = FIT_HEIGHT
         ),
     };
