@@ -4,7 +4,7 @@ use std::io::{self, Write};
 // Compact window size to fit dog + text
 const FIT_WIDTH: u32 = 400;   // pixels - width for text display
 const FIT_HEIGHT: u32 = 340;  // pixels - height for text + dog (14 rows)
-const MARGIN: u32 = 20;       // margin from screen edge
+const MARGIN: u32 = 0;        // no margin from screen edge
 
 /// Direction for window movement
 pub enum Direction {
